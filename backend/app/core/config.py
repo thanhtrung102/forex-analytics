@@ -2,11 +2,19 @@
 
 import os
 from functools import lru_cache
-from pydantic_settings import BaseSettings
+from typing import List, Union
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        protected_namespaces=("settings_",),  # Allow model_ prefix
+    )
 
     # Application
     app_name: str = "Forex Prediction API"
@@ -18,7 +26,7 @@ class Settings(BaseSettings):
 
     # Security
     secret_key: str = "change-me-in-production"
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
+    cors_origins: Union[str, List[str]] = "http://localhost:3000,http://localhost:8000"
 
     # ML Models
     model_path: str = "./models"
@@ -26,9 +34,13 @@ class Settings(BaseSettings):
     # API
     api_prefix: str = "/api"
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        """Parse CORS origins from comma-separated string or list."""
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     @property
     def database_url_sync(self) -> str:
